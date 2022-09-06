@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"go-task-5/app/"
-	"github.com/victorsteven/fullstack/api/responses"
+	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/api/app/auth"
+	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/api/app/responses"
 )
 
 func SetMiddlewareJSON(next http.HandlerFunc) http.HandlerFunc {

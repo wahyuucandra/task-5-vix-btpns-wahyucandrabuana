@@ -53,3 +53,13 @@ func (u *User) Register(db *gorm.DB) (*User, error) {
 	}
 	return u, nil
 }
+
+func (u *User) FindAllUsers(db *gorm.DB) (*[]User, error) {
+	var err error
+	users := []User{}
+	err = db.Debug().Model(&User{}).Limit(100).Find(&users).Error
+	if err != nil {
+		return &[]User{}, err
+	}
+	return &users, err
+}
