@@ -8,13 +8,13 @@ import (
 func ErrorMessage (err string) error {
 	
 	if strings.Contains(err, "pkey") {
-		return errors.New("user id already taken")
+		return errors.New("user id already registered")
 	}else if strings.Contains(err, "email_key") {
-		return errors.New("email already taken")
-	}else if strings.Contains(err, "title") {
-		return errors.New("title already taken")
+		return errors.New("email has been registered")
+	}else if strings.Contains(err, "user not found") {
+		return errors.New("email has not been registered")
 	}else if strings.Contains(err, "hashedPassword") {
 		return errors.New("incorrect password")
 	}
-	return errors.New("incorrect details")
+	return errors.New(err)
 }

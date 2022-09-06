@@ -9,13 +9,13 @@ import (
 
 var users = []models.User{
 	{
-		ID: "U0001",
+		ID: "e771f627-b7ea-4a02-b0c2-3b1c106f1cbc",
 		Username: "Steven victor",
 		Email:    "steven@gmail.com",
 		Password: "password",
 	},
 	{
-		ID: "U0002",
+		ID: "e771f327-b7ea-4a03-b0c2-3b1c106f1a7a",
 		Username: "Martin Luther",
 		Email:    "luther@gmail.com",
 		Password: "password",

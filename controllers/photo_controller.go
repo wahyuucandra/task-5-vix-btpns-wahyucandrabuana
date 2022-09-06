@@ -16,12 +16,12 @@ func (server *Server) CreatePhoto(w http.ResponseWriter, r *http.Request) {
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
 	}
 	user := models.User{}
 	err = json.Unmarshal(body, &user)
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
 		return
 	}
 	user.Prepare()
@@ -36,11 +36,11 @@ func (server *Server) CreatePhoto(w http.ResponseWriter, r *http.Request) {
 
 		formattedError := formaterror.ErrorMessage(err.Error())
 
-		responses.ERROR(w, http.StatusInternalServerError, formattedError)
+		responses.ERROR(w, http.StatusInternalServerError, "F", formattedError)
 		return
 	}
 	w.Header().Set("Location", fmt.Sprintf("%s%s/%s", r.Host, r.RequestURI, userCreated.ID))
-	responses.JSON(w, http.StatusCreated, userCreated)
+	responses.JSON(w, http.StatusCreated, "T", "success", userCreated)
 }
 
 func (server *Server) GetPhotos(w http.ResponseWriter, r *http.Request) {
@@ -49,8 +49,8 @@ func (server *Server) GetPhotos(w http.ResponseWriter, r *http.Request) {
 
 	users, err := photo.GetPhotos(server.DB)
 	if err != nil {
-		responses.ERROR(w, http.StatusInternalServerError, err)
+		responses.ERROR(w, http.StatusInternalServerError, "F", err)
 		return
 	}
-	responses.JSON(w, http.StatusOK, users)
+	responses.JSON(w, http.StatusOK, "T", "success", users)
 }
