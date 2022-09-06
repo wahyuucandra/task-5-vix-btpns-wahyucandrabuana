@@ -1,4 +1,4 @@
-package error
+package formaterror
 
 import (
 	"errors"
@@ -6,18 +6,14 @@ import (
 )
 
 func ErrorMessage (err string) error {
-	if strings.Contains(err, "nickname") {
-		return errors.New("nickname already taken")
-	}
-
-	if strings.Contains(err, "email") {
+	
+	if strings.Contains(err, "pkey") {
+		return errors.New("user id already taken")
+	}else if strings.Contains(err, "email_key") {
 		return errors.New("email already taken")
-	}
-
-	if strings.Contains(err, "title") {
+	}else if strings.Contains(err, "title") {
 		return errors.New("title already taken")
-	}
-	if strings.Contains(err, "hashedPassword") {
+	}else if strings.Contains(err, "hashedPassword") {
 		return errors.New("incorrect password")
 	}
 	return errors.New("incorrect details")

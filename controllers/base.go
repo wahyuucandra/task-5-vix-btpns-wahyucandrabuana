@@ -9,7 +9,6 @@ import (
 	"github.com/jinzhu/gorm"
 
 	_ "github.com/jinzhu/gorm/dialects/postgres" //postgres database driver
-
 	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/models"
 )
 
@@ -34,10 +33,8 @@ func (server *Server) Initialize(Dbdriver, DbUser, DbPassword, DbPort, DbHost, D
 	}
 
 	server.DB.Debug().AutoMigrate(&models.User{}, &models.Photo{}) //database migration
-
 	server.Router = mux.NewRouter()
-
-	//server.initializeRoutes()
+	server.initializeRoutes()
 }
 
 func (server *Server) Run(addr string) {

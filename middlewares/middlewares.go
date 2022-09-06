@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/api/app/auth"
-	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/api/app/responses"
+	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/app/auth"
+	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/app/responses"
 )
 
 func SetMiddlewareJSON(next http.HandlerFunc) http.HandlerFunc {
