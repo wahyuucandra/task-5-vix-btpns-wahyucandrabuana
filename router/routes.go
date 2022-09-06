@@ -12,6 +12,7 @@ func SetupRoutes(db *gorm.DB) *gin.Engine {
     r.Use(func(c *gin.Context) {
         c.Set("db", db)
     })
+    r.POST("/users/login", controllers.Login)
     r.POST("/users/register", controllers.CreateUser)
 	r.PUT("/users/:userId", controllers.UpdateUser)
 	r.DELETE("/users/:userId", controllers.DeleteUser)
