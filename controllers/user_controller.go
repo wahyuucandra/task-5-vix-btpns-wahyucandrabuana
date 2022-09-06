@@ -1,209 +1,106 @@
 package controllers
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io/ioutil"
+	"log"
 	"net/http"
-	"strconv"
 
-	"github.com/gorilla/mux"
-	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/app/auth"
-	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/app/responses"
-	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/helpers/formaterror"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/models"
 	"golang.org/x/crypto/bcrypt"
 )
+type CreateUserInput struct {
+    Username 	string 		`json:"username"`
+	Email 		string 		`json:"email"`
+	Password 	string 		`json:"password"`
+}
 
-//Fungsi Register User
-func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
+type UpdateUserInput struct {
+    Username 	string 		`json:"username"`
+	Email 		string 		`json:"email"`
+	Password 	string 		`json:"password"`
+}
 
-	//membaca response body
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
-	}
+func Hash(password string) ([]byte, error) {
+	return bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+}
 
-	//Mengubah json menjadi object User
-	user := models.User{}
-	err = json.Unmarshal(body, &user)
-	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
+func CreateUser(c *gin.Context) {
+	// Validate input
+	var input CreateUserInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	//Melakukan prepare inisialisi data
-	user.Prepare()
-	//Melakukan pengecekan validasi ketika register
-	err = user.Validate("register")
 	
-	//Menampilkan error dari validasi
+	id 	:= uuid.New()
+	hashedPassword, err := Hash(input.Password)
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
-		return
+		log.Fatal("This is the error:", err)
 	}
-	userCreated, err := user.Register(server.DB)
+	input.Password = string(hashedPassword)
 
-	//custom error message
-	if err != nil {
-		formattedError := formaterror.ErrorMessage(err.Error())
-
-		responses.ERROR(w, http.StatusInternalServerError, "F", formattedError)
-		return
+	// Create user
+	user := models.User{
+		ID: id.String(),
+		Username: input.Username,
+		Email: input.Email,
+		Password: input.Password,
 	}
 
-	//Memberikan respose ketika berhasil
-	w.Header().Set("Location", fmt.Sprintf("%s%s/%s", r.Host, r.RequestURI, userCreated.ID))
-	responses.JSON(w, http.StatusCreated, "T", "user successfully registered", userCreated)
+	db := c.MustGet("db").(*gorm.DB)
+	db.Create(&user)
+
+	c.JSON(http.StatusOK, gin.H{"status": "T", "message": "Success", "data": user})
 }
 
-//Menampilkan semua user yang terdaftar ke database
-func (server *Server) GetUsers(w http.ResponseWriter, r *http.Request) {
+func UpdateUser(c *gin.Context) {
 
-	user := models.User{}
-	users, err := user.FindAllUsers(server.DB)
+    db := c.MustGet("db").(*gorm.DB)
+    // Get model if exist
+    var user models.User
+    if err := db.Where("id = ?", c.Param("userId")).First(&user).Error; err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Data tidak ditemukan!!"})
+        return
+    }
+
+    // Validate input
+    var input UpdateUserInput
+    if err := c.ShouldBindJSON(&input); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+	hashedPassword, err := Hash(input.Password)
 	if err != nil {
-		responses.ERROR(w, http.StatusInternalServerError, "F", err)
-		return
+		log.Fatal("This is the error:", err)
 	}
-	responses.JSON(w, http.StatusOK, "T", "Success", users)
+	input.Password = string(hashedPassword)
+
+    var updatedInput models.User
+    updatedInput.Email 		= input.Email
+    updatedInput.Username 	= input.Username
+    updatedInput.Password 	= input.Password
+
+    db.Model(&user).Updates(updatedInput)
+
+    c.JSON(http.StatusOK, gin.H{"status": "T", "message": "Success", "data": user})
 }
 
-//Melakukan pengecekan login dan membuat token jwt
-func (server *Server) SignIn(email, password string) (string, error) {
+func DeleteUser(c *gin.Context) {
 
-	var err error
+    db := c.MustGet("db").(*gorm.DB)
+    var user models.User
+    if err := db.Where("id = ?", c.Param("userId")).First(&user).Error; err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Data tidak ditemukan!!"})
+        return
+    }
 
-	user := models.User{}
+    db.Delete(&user)
 
-	//Melakukan pengecekan user di database berdasarkan email
-	err = server.DB.Debug().Model(models.User{}).Where("email = ?", email).Take(&user).Error
-	if err != nil {
-		var formattedError error
-		if(err.Error() == "record not found"){
-			formattedError = formaterror.ErrorMessage("user not found")
-		}
-		return "", formattedError
-	}
-
-	//Melakukan verifikasi password db dan user input
-	err = models.VerifyPassword(user.Password, password)
-	if err != nil && err == bcrypt.ErrMismatchedHashAndPassword {
-		return "", err
-	}
-
-	//Ketika berhasil login akan membuat token jwt
-	return auth.CreateToken(user.ID)
+    c.JSON(http.StatusOK, gin.H{"status": "T", "message": "Success", "data": nil})
 }
 
 
-//Melakukan login
-func (server *Server) Login(w http.ResponseWriter, r *http.Request) {
-	//Membaca data dari bosy
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
-		return
-	}
-
-	//Mengubah json ke objek user
-	user := models.User{}
-	err = json.Unmarshal(body, &user)
-	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
-		return
-	}
-
-	//Melakukan perisapan inisialisi dan validasi
-	user.Prepare()
-	err = user.Validate("login")
-	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
-		return
-	}
-
-	//Melakukan pengecekan login
-	token, err := server.SignIn(user.Email, user.Password)
-	if err != nil {
-		formattedError := formaterror.ErrorMessage(err.Error())
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", formattedError)
-		return
-	}
-	//Ketika berhasil login memeberikan response success
-	responses.JSON(w, http.StatusOK, "T", "login successfully", 
-		struct {Token string `json:"token"`}{ Token: token,})
-}
-
-func (server *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
-
-	vars := mux.Vars(r)
-	uid, err := strconv.ParseUint(vars["id"], 10, 32)
-	if err != nil {
-		responses.ERROR(w, http.StatusBadRequest, "F", err)
-		return
-	}
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
-		return
-	}
-	user := models.User{}
-	err = json.Unmarshal(body, &user)
-	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
-		return
-	}
-	tokenID, err := auth.ExtractTokenID(r)
-	if err != nil {
-		responses.ERROR(w, http.StatusUnauthorized, "F", errors.New("Unauthorized"))
-		return
-	}
-	if tokenID != uint32(uid) {
-		responses.ERROR(w, http.StatusUnauthorized, "F", errors.New(http.StatusText(http.StatusUnauthorized)))
-		return
-	}
-	user.Prepare()
-	err = user.Validate("update")
-	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, "F", err)
-		return
-	}
-	// updatedUser, err := user.UpdateUser(server.DB, uid)
-	// if err != nil {
-	// 	formattedError := formaterror.ErrorMessage()(err.Error())
-	// 	responses.ERROR(w, http.StatusInternalServerError, formattedError)
-	// 	return
-	// }
-	// responses.JSON(w, http.StatusOK, updatedUser)
-}
-
-// func (server *Server) DeleteUser(w http.ResponseWriter, r *http.Request) {
-
-// 	vars := mux.Vars(r)
-
-// 	user := models.User{}
-
-// 	uid, err := strconv.ParseUint(vars["id"], 10, 32)
-// 	if err != nil {
-// 		responses.ERROR(w, http.StatusBadRequest, err)
-// 		return
-// 	}
-// 	tokenID, err := auth.ExtractTokenID(r)
-// 	if err != nil {
-// 		responses.ERROR(w, http.StatusUnauthorized, errors.New("Unauthorized"))
-// 		return
-// 	}
-// 	if tokenID != 0 && tokenID != uint32(uid) {
-// 		responses.ERROR(w, http.StatusUnauthorized, errors.New(http.StatusText(http.StatusUnauthorized)))
-// 		return
-// 	}
-// 	_, err = user.DeleteAUser(server.DB, uint32(uid))
-// 	if err != nil {
-// 		responses.ERROR(w, http.StatusInternalServerError, err)
-// 		return
-// 	}
-// 	w.Header().Set("Entity", fmt.Sprintf("%d", uid))
-// 	responses.JSON(w, http.StatusNoContent, "")
-// }
 
