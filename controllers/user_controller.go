@@ -8,13 +8,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
+	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/app"
 	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/app/auth"
 	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/helpers/formaterror"
+	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/helpers/hash"
 	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
+//Register data User
 func CreateUser(c *gin.Context) {
+	//set database
+	db := c.MustGet("db").(*gorm.DB)
+
 	// Membaca data body
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
@@ -22,53 +28,66 @@ func CreateUser(c *gin.Context) {
 	}
 
 	//Mengubah json menjadi object User
-	user := models.User{}
-	err = json.Unmarshal(body, &user)
+	user_input := models.User{}
+	err = json.Unmarshal(body, &user_input)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": err.Error(), "data": nil})
 		return
 	}
 
 	//Melakukan inisialisasi data user
-	user.Initialize()
+	user_input.Initialize()
 
-	//custom error message
+	//Melakukan validasi data user
+	err = user_input.Validate("update")
 	if err != nil {
-		formattedError := formaterror.ErrorMessage(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "F", "message": formattedError, "data": nil})
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": err.Error(), "data": nil})
 		return
 	}
 
+
 	//Melakukan Hash password
-	err = user.HashPassword()
+	err = user_input.HashPassword()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db := c.MustGet("db").(*gorm.DB)
-	db.Create(&user)
-
-	//custom error message
+	//Create data user ke database
+	err = db.Debug().Create(&user_input).Error
 	if err != nil {
 		formattedError := formaterror.ErrorMessage(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "F", "message": formattedError, "data": nil})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "F", "message": formattedError.Error(), "data": nil})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "T", "message": "Success", "data": user})
+	//Custom response data
+	data := app.UserRegister{
+		ID: user_input.ID,
+		Username: user_input.Username,
+		Email: user_input.Email,
+		CreatedAt: user_input.CreatedAt,
+		UpdatedAt: user_input.UpdatedAt,
+	}
+
+	//Response success
+	c.JSON(http.StatusOK, gin.H{"status": "T", "message": "register user success", "data": data})
 }
 
+//Update data user
 func UpdateUser(c *gin.Context) {
 
+	//Set database
 	db := c.MustGet("db").(*gorm.DB)
-	// Get model if exist
+
+	//Melakukan cek apakah data yang ingin diubah ada berdasarkan user id dari param
 	var user models.User
-	if err := db.Where("id = ?", c.Param("userId")).First(&user).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "F", "message": "User not found", "data": nil})
+	err := db.Debug().Where("id = ?", c.Param("userId")).First(&user).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "F", "message": "user not found", "data": nil})
 		return
 	}
 
-	// Membaca data body
+	//Membaca data body
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": err.Error(), "data": nil})
@@ -96,34 +115,58 @@ func UpdateUser(c *gin.Context) {
 		log.Fatal(err)
 	}
 
-	db.Model(&user).Updates(&user_input)
-
-	//custom error message
+	//Melakukan update data user ke database
+	err = db.Debug().Model(&user).Updates(&user_input).Error
 	if err != nil {
 		formattedError := formaterror.ErrorMessage(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "F", "message": formattedError, "data": nil})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "F", "message": formattedError.Error(), "data": nil})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "T", "message": "Success", "data": user_input})
+	//Custom response data
+	data := app.UserRegister{
+		ID: user_input.ID,
+		Username: user_input.Username,
+		Email: user_input.Email,
+		CreatedAt: user_input.CreatedAt,
+		UpdatedAt: user_input.UpdatedAt,
+	}
+
+	//Response success
+	c.JSON(http.StatusOK, gin.H{"status": "T", "message": "update user success", "data": data})
 }
 
+//Menghapus data user
 func DeleteUser(c *gin.Context) {
 
+	//Set databse 
 	db := c.MustGet("db").(*gorm.DB)
+
+	//Melakukan cek apakah data yang ingin dihapus ada berdasarkan user id dari param
 	var user models.User
-	if err := db.Where("id = ?", c.Param("userId")).First(&user).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "F", "message": "User not found", "data": nil})
+	
+	err := db.Debug().Where("id = ?", c.Param("userId")).First(&user).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "F", "message": "user not found", "data": nil})
 		return
 	}
 
-	db.Delete(&user)
+	//Menghapus data user dari database
+	err = db.Debug().Delete(&user).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "F", "message": err.Error(), "data": nil})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "T", "message": "Success", "data": nil})
+	//Response succes
+	c.JSON(http.StatusOK, gin.H{"status": "T", "message": "delete user success", "data": nil})
 }
 
 //Melakukan login
 func Login(c *gin.Context) {
+	//Set database
+	db := c.MustGet("db").(*gorm.DB)
+
 	//Membaca data dari body
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
@@ -132,48 +175,52 @@ func Login(c *gin.Context) {
 	}
 
 	//Mengubah json ke objek user
-	user := models.User{}
-	err = json.Unmarshal(body, &user)
+	user_input := models.User{}
+	err = json.Unmarshal(body, &user_input)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": err.Error(), "data": nil})
 		return
 	}
 
 	//Melakukan perisapan inisialisi dan validasi
-	user.Initialize()
-	err = user.Validate("login")
+	user_input.Initialize()
+	err = user_input.Validate("login")
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": err.Error(), "data": nil})
 		return
 	}
-
 	
 	//Melakukan pengecekan user di database berdasarkan email
-	var user_login models.User
-	db := c.MustGet("db").(*gorm.DB)
-	if err := db.Where("email = ?", user.Email).First(&user_login).Error; err != nil {
-		formattedError := err
-		if(err.Error() == "record not found"){
-			formattedError = formaterror.ErrorMessage("user not found")
-		}
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": formattedError, "data": nil})
+	var user_login app.UserLogin
+	
+	err = db.Debug().Table("users").Select("*").Joins("left join photos on photos.user_id = users.id").
+	Where("users.email = ?", user_input.Email).Find(&user_login).Error;
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "F", "message": "user not found", "data": nil})
 		return
 	}
 
 	//Melakukan verifikasi password db dan user input
-	err = models.VerifyPassword(user_login.Password, user.Password)
+	err = hash.VerifyPassword(user_login.Password, user_input.Password)
 	if err != nil && err == bcrypt.ErrMismatchedHashAndPassword {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": err.Error(), "data": nil})
-		return 
+		formattedError := formaterror.ErrorMessage(err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"status": "F", "message": formattedError.Error(), "data": nil})
+		return
 	}
 
 	//Ketika berhasil login akan membuat token jwt
-	token, err := auth.CreateToken(user_login.ID)
+	token, err := auth.GenerateJWT(user_login.Email, user_login.Username)
 	if err != nil {
-		formattedError := formaterror.ErrorMessage(err.Error())
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": formattedError, "data": nil})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "F", "message": err.Error(), "data": nil})
 		return
 	}
+
+	//Melakukan custom response untuk data
+	data := app.DataUser{
+		ID: user_login.ID, Username: user_login.Username, Email: user_login.Email, Token: token,
+		Photos: app.Photo{Title: user_login.Title, Caption: user_login.Caption, PhotoUrl: user_login.PhotoUrl},
+	}
+
 	//Ketika berhasil login memeberikan response success
-	c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "F", "message": "success", "data": token})
+	c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "T", "message": "login success", "data": data})
 }

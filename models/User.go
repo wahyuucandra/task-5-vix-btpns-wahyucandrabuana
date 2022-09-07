@@ -8,7 +8,7 @@ import (
 
 	"github.com/badoux/checkmail"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/helpers/hash"
 )
 
 type User struct {
@@ -16,28 +16,27 @@ type User struct {
 	Username 	string 		`gorm:"size:255;not null;" json:"username"`
 	Email 		string 		`gorm:"size:100;not null; unique" json:"email"`
 	Password 	string 		`gorm:"size:100;not null;" json:"password"`
-	Photos 		[]Photo 	`gorm:"constraint:OnUpdate:CASCADE;" json:"photos"`
+	Photos 		Photo 		`gorm:"constraint:OnUpdate:CASCADE, OnDelete:SET NULL;" json:"photos"`
 	CreatedAt 	time.Time 	`gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt 	time.Time 	`gorm:"default:CURRENT_TIMESTAMP" json:"updated_at"`
 }
 
-//Untuk Hash password daru bcrypt
-func Hash(password string) ([]byte, error) {
-	return bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-}
-
-//Untuk melakukan validasi password pada saat login
-func VerifyPassword(hashedPassword, password string) error {
-	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
-}
-
 //Untuk mengubah password yang akan di save ke dalam bentuk hash password
 func (u *User) HashPassword() error {
-	hashedPassword, err := Hash(u.Password)
+	hashedPassword, err := hash.Hash(u.Password)
 	if err != nil {
 		return err
 	}
 	u.Password = string(hashedPassword)
+	return nil
+}
+
+//Check password
+func (user *User) CheckPassword(providedPassword string) error {
+	err := hash.VerifyPassword(user.Password, providedPassword)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -46,9 +45,9 @@ func (u *User) Initialize() {
 	u.ID 		= uuid.New().String()
 	u.Username 	= html.EscapeString(strings.TrimSpace(u.Username))
 	u.Email 	= html.EscapeString(strings.TrimSpace(u.Email))
-	u.Photos	= []Photo{}
 }
 
+//Untuk validasi data user input sebelum disimpan
 func (u *User) Validate(action string) error {
 	switch strings.ToLower(action) {
 	case "register":

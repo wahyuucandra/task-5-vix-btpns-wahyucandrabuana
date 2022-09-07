@@ -1,27 +1,27 @@
 package middlewares
 
 import (
-	"errors"
-	"net/http"
+	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/app/auth"
-	"github.com/wahyuucandra/task-5-vix-btpns-wahyucandrabuana/app/responses"
 )
 
-func SetMiddlewareJSON(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		next(w, r)
-	}
-}
-
-func SetMiddlewareAuthentication(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		err := auth.TokenValid(r)
-		if err != nil {
-			responses.ERROR(w, http.StatusUnauthorized, "F", errors.New("Unauthorized"))
+func Auth() gin.HandlerFunc{
+	return func(context *gin.Context) {
+		tokenString := context.GetHeader("Authorization")
+		if tokenString == "" {
+			context.JSON(401, gin.H{"error": "request does not contain an access token"})
+			context.Abort()
 			return
 		}
-		next(w, r)
+
+		err:= auth.ValidateToken(strings.Split(tokenString, "Bearer ")[1])
+		if err != nil {
+			context.JSON(401, gin.H{"error": err.Error()})
+			context.Abort()
+			return
+		}
+		context.Next()
 	}
 }
